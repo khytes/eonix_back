@@ -1,133 +1,113 @@
 <?php
 	// Connect to database
 	include("db_connect.php");
-	$request_method = $_SERVER["REQUEST_METHOD"];
-
-	function getUsers()
-	{
-		global $conn;
-		$query = "SELECT * FROM users";
-		$response = array();
-		$result = mysqli_query($conn, $query);
-		while($row = mysqli_fetch_array($result))
-		{
-			$response[] = $row;
-		}
-		header('Content-Type: application/json');
-		echo json_encode($response, JSON_PRETTY_PRINT);
-	}
 	
-	function getUser($id=0)
+	$request_method = $_SERVER["REQUEST_METHOD"];
+	
+	function getUser($id=null, $query=null)
 	{
-		global $conn;
-		$query = "SELECT * FROM users";
-		if($id != 0)
-		{
-			$query .= " WHERE id=".$id." LIMIT 1";
+
+		global $mysqlClient;
+
+		$stmt = $mysqlClient->prepare('SELECT * FROM users');
+		$params = [];
+		
+
+		if($query != null){
+			$stmt = $mysqlClient->prepare('SELECT * FROM users WHERE firstname LIKE :query OR lastname LIKE :query');
+			$params = ['query' =>'%'. $query.'%'];
 		}
-		$response = array();
-		$result = mysqli_query($conn, $query);
-		while($row = mysqli_fetch_array($result))
+
+		if($id != null)
 		{
-			$response[] = $row;
+			$stmt = $mysqlClient->prepare('SELECT * FROM users WHERE id=:id');
+			$params = ['id' => $id];
 		}
+
+
+		$stmt->execute($params); 
+		$response = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 		header('Content-Type: application/json');
 		echo json_encode($response, JSON_PRETTY_PRINT);
+
 	}
 	
 	function AddUser()
 	{
-		global $conn;
 		$firstname = $_POST["firstname"];
 		$lastname = $_POST["lastname"];
-		echo $query="INSERT INTO users(firstname, lastname) VALUES('".$firstname."', '".$lastname."')";
-		if(mysqli_query($conn, $query))
-		{
-			$response=array(
-				'status' => 1,
-				'status_message' =>'User ajouté avec succès.'
-			);
-		}
-		else
-		{
-			$response=array(
-				'status' => 0,
-				'status_message' =>'ERREUR!.'. mysqli_error($conn)
-			);
-		}
+		global $mysqlClient;
+		$stmt = $mysqlClient->prepare('INSERT INTO users(firstname, lastname) VALUES(:firstname, :lastname)');
+		$params = ['firstname' => $firstname, 'lastname' => $lastname];
+
+		
+		$stmt->execute($params); 
+
 		header('Content-Type: application/json');
-		echo json_encode($response);
+		echo json_encode("{ status: created }", JSON_PRETTY_PRINT);
 	}
 	
 	function updateUser($id)
 	{
-		global $conn;
+		global $mysqlClient;
+
 		$_PUT = array();
 		parse_str(file_get_contents('php://input'), $_PUT);
 		$firstname = $_PUT["firstname"];
 		$lastname = $_PUT["lastname"];
-		$query="UPDATE users SET firstname='".$firstname."', lastname='".$lastname."' WHERE id=".$id;
+		$stmt = $mysqlClient->prepare('UPDATE users SET firstname=:firstname, lastname=:lastname WHERE id=:id');
+		$params = ['firstname' => $firstname, 'lastname' => $lastname, 'id' => $id];
 		
-		if(mysqli_query($conn, $query))
-		{
-			$response=array(
-				'status' => 1,
-				'status_message' =>'User mis a jour avec succes.'
-			);
-		}
-		else
-		{
-			$response=array(
-				'status' => 0,
-				'status_message' =>'Echec de la mise a jour de user. '. mysqli_error($conn)
-			);
-			
-		}
-		
+		$stmt->execute($params); 
+
 		header('Content-Type: application/json');
-		echo json_encode($response);
+		echo json_encode("{ status: updated }", JSON_PRETTY_PRINT);
 	}
 	
 	function deleteUser($id)
 	{
-		global $conn;
-		$query = "DELETE FROM users WHERE id=".$id;
-		if(mysqli_query($conn, $query))
-		{
-			$response=array(
-				'status' => 1,
-				'status_message' =>'User supprime avec succes.'
-			);
-		}
-		else
-		{
-			$response=array(
-				'status' => 0,
-				'status_message' =>'La suppression du User a echoue. '. mysqli_error($conn)
-			);
-		}
+		global $mysqlClient;
+
+		$stmt = $mysqlClient->prepare('DELETE FROM users WHERE id=:id');
+		$params = ['id' => $id];
+		
+		$stmt->execute($params); 
+
 		header('Content-Type: application/json');
-		echo json_encode($response);
+		echo json_encode("{ status: deleted }", JSON_PRETTY_PRINT);
+
 	}
 	
 	switch($request_method)
 	{
 		
 		case 'GET':
-			// Retrive Users
+			// Retrieve Users
+			$id=null;
+			$query=null;
+			$from=null;
+			$to=null;
+			
 			if(!empty($_GET["id"]))
 			{
-				$id=intval($_GET["id"]);
-				getUser($id);
+				if (!ctype_digit($_GET['id'])) {
+					header('Content-Type: application/json');
+					echo json_encode('{ error: invalid_id }', JSON_PRETTY_PRINT);
+					return false;
+				} else {
+					$id = (int)$_GET['id'];
+				}
+				
 			}
-			else
+
+			if(!empty($_GET["query"]))
 			{
-				getUsers();
+				$query=$_GET["query"];	
 			}
-			break;
-		default:
-			// Invalid Request Method
-			header("HTTP/1.0 405 Method Not Allowed");
+
+
+			getUser($id, $query);
 			break;
 			
 		case 'POST':
@@ -145,6 +125,11 @@
 			// Supprimer un produit
 			$id = intval($_GET["id"]);
 			deleteUser($id);
+			break;
+		
+		default:
+			// Invalid Request Method
+			header("HTTP/1.0 405 Method Not Allowed");
 			break;
 
 	}

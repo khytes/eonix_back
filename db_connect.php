@@ -4,5 +4,12 @@
 	$password = "";
 	$db = "eonix";
 	$port = 3307;
-	$conn = mysqli_connect($server, $username, $password, $db, $port);
+
+
+	// Souvent on identifie cet objet par la variable $conn ou $db
+	$mysqlClient = new PDO(
+		'mysql:host='.$server.';port='.$port.';dbname='.$db.';charset=utf8',
+		$username,
+		$password
+	);
 ?>
