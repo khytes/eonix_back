@@ -2,7 +2,8 @@
 retourne tous les users
 
 ### optional parameters => id, query
-retourne les users par ID ou par query (LIKE, case insensitive)
+GET: http://rest-api/api/users?id=1
+GET: http://rest-api/api/users?query=test
 
 ## POST: http://rest-api/api/users
 ### parameters => firstname, lastname
